@@ -452,12 +452,12 @@ bot.dom.getCascadedStyle_ = function (elem, styleName) {
  * @param {!Element} elem The element to consider.
  * @param {boolean} ignoreOpacity Whether to ignore the element's opacity
  *     when determining whether it is shown.
- * @param {function(!Element):boolean} parentsDisplayedFn a function that's used
- *     to tell if the chain of ancestors are all shown.
+ * @param {function(!Element):boolean} displayedFn a function that's used
+ *     to tell if the chain of ancestors or descendants are all shown.
  * @return {boolean} Whether or not the element is visible.
  * @private
  */
-bot.dom.isShown_ = function (elem, ignoreOpacity, parentsDisplayedFn) {
+bot.dom.isShown_ = function (elem, ignoreOpacity, displayedFn) {
   if (!bot.dom.isElement(elem)) {
     throw new Error('Argument to isShown must be of type Element');
   }
@@ -476,7 +476,7 @@ bot.dom.isShown_ = function (elem, ignoreOpacity, parentsDisplayedFn) {
     var select = /**@type {Element}*/ (goog.dom.getAncestor(elem, function (e) {
       return bot.dom.isElement(e, goog.dom.TagName.SELECT);
     }));
-    return !!select && bot.dom.isShown_(select, true, parentsDisplayedFn);
+    return !!select && bot.dom.isShown_(select, true, displayedFn);
   }
 
   // Image map elements are shown if image that uses it is shown, and
@@ -486,7 +486,7 @@ bot.dom.isShown_ = function (elem, ignoreOpacity, parentsDisplayedFn) {
     return !!imageMap.image &&
       imageMap.rect.width > 0 && imageMap.rect.height > 0 &&
       bot.dom.isShown_(
-        imageMap.image, ignoreOpacity, parentsDisplayedFn);
+        imageMap.image, ignoreOpacity, displayedFn);
   }
 
   // Any hidden input is not shown.
@@ -500,13 +500,7 @@ bot.dom.isShown_ = function (elem, ignoreOpacity, parentsDisplayedFn) {
     return false;
   }
 
-  // Any element with hidden/collapsed visibility is not shown.
-  var visibility = bot.dom.getEffectiveStyle(elem, 'visibility');
-  if (visibility == 'collapse' || visibility == 'hidden') {
-    return false;
-  }
-
-  if (!parentsDisplayedFn(elem)) {
+  if (!displayedFn(elem)) {
     return false;
   }
 
@@ -526,6 +520,9 @@ bot.dom.isShown_ = function (elem, ignoreOpacity, parentsDisplayedFn) {
     if (bot.dom.isElement(e, 'PATH') && (rect.height > 0 || rect.width > 0)) {
       var strokeWidth = bot.dom.getEffectiveStyle(e, 'stroke-width');
       return !!strokeWidth && (parseInt(strokeWidth, 10) > 0);
+    }
+    if (!displayedFn(e)) {
+      return false;
     }
     // Zero-sized elements should still be considered to have positive size
     // if they have a child element or text node with positive size, unless
@@ -572,7 +569,7 @@ bot.dom.isShown_ = function (elem, ignoreOpacity, parentsDisplayedFn) {
  */
 bot.dom.isShown = function (elem, opt_ignoreOpacity) {
   /**
-   * Determines whether an element or its parents have `display: none` set
+   * Determines whether an element or its parents have `display: none` or similar CSS properties set
    * @param {!Node} e the element
    * @return {!boolean}
    */
@@ -580,6 +577,9 @@ bot.dom.isShown = function (elem, opt_ignoreOpacity) {
     if (bot.dom.isElement(e)) {
       var elem = /** @type {!Element} */ (e);
       if ((bot.dom.getEffectiveStyle(elem, 'display') == 'none')
+        // Any element with hidden/collapsed visibility is not shown.
+        || (bot.dom.getEffectiveStyle(elem, 'visibility') == 'hidden')
+        || (bot.dom.getEffectiveStyle(elem, 'visibility') == 'collapse')
         || (bot.dom.getEffectiveStyle(elem, 'content-visibility') == 'hidden')) {
         return false;
       }
